@@ -200,9 +200,6 @@ class YOLOCropper:
 
 
 
-cropper = YOLOCropper(model_path='Yolo_project/weights/best_v1.pt', obb_model=True) #runs/detect/train/weights/best.pt
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_9_value_18_724.jpg', output_dir='CroppedImages')
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_553_value_65_475.jpg', output_dir='CroppedImages')
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_823_value_797_0.jpg', output_dir='CroppedImages')
+cropper = YOLOCropper(model_path='Yolo_project/weights/best_v1.pt', obb_model=True)
 cropper.crop_images_from_folder(input_dir='Yolo_project/TlkWaterMeters/images', output_dir='Yolo_project/CroppedImages', max_images=500)
 cropper.cut_images_into_numbers(input_dir='Yolo_project/CroppedImages', output_dir='Yolo_project/digits')
