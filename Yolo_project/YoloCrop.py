@@ -19,29 +19,21 @@ class YOLOCropper:
 
         self.obb_model = obb_model
 
-
     def is_image_flipped(self, warped):
-        height, width = warped.shape[:2]
+        # Обработка перевернутого изображения
+        hsv_image = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV) # пространство HSV
+    
+        red_mask = cv2.inRange(hsv_image, (0, 50, 50), (10, 255, 255)) | cv2.inRange(hsv_image, (350, 50, 50), (360, 255, 255))
+
+        height, width = red_mask.shape
         
-        left_half = warped[:, :width // 2]
-        right_half = warped[:, width // 2:]
-        
-        red_left = left_half[:, :, 2]
-        red_right = right_half[:, :, 2]
+        left_half = red_mask[:, :width // 2]
+        right_half = red_mask[:, width // 2:]
 
-        mean_red_left = np.mean(red_left)
-        mean_red_right = np.mean(red_right)
+        red_count_left = cv2.countNonZero(left_half)
+        red_count_right = cv2.countNonZero(right_half)
 
-        # Эксцесс - «острота» пика гистограммы
-        kurtosis_left = kurtosis(red_left.flatten())
-        kurtosis_right = kurtosis(red_right.flatten())
-
-        # print(f"Среднее значение красного канала (левая половина): {mean_red_left}")
-        # print(f"Среднее значение красного канала (правая половина): {mean_red_right}")
-        # print(f"Эксцесс (левая половина): {kurtosis_left}")
-        # print(f"Эксцесс (правая половина): {kurtosis_right}")
-
-        if mean_red_left > mean_red_right or kurtosis_left > kurtosis_right:
+        if red_count_left > red_count_right:
             warped = cv2.rotate(warped, cv2.ROTATE_180)
 
         return warped
@@ -131,7 +123,7 @@ class YOLOCropper:
             image_path = os.path.join(input_dir, image_file)
             self.crop_image(image_path, output_dir)
 
-    def cut_images_into_numbers(self, input_dir):
+    def cut_images_into_numbers(self, input_dir, output_dir='digits'):
         for filename in glob.glob(input_dir+"/*"):
             try:
                 image_name = os.path.basename(filename).split('.')[0]
@@ -163,7 +155,7 @@ class YOLOCropper:
 
                         
                         for i, j in enumerate(padded_value):
-                            digit_folder = f'digits/{int(j)}'
+                            digit_folder = f'{output_dir}/{int(j)}'
                             os.makedirs(digit_folder, exist_ok=True)  
                             
                             output_filename = f'{digit_folder}/{image_name}_digit_{i}.jpg'
@@ -193,7 +185,7 @@ class YOLOCropper:
                             columns.append(column)
                         
                         for i, j in enumerate(padded_value):
-                            digit_folder = f'digits/{int(j)}'
+                            digit_folder = f'{output_dir}/{int(j)}'
                             os.makedirs(digit_folder, exist_ok=True)  
                             
                             output_filename = f'{digit_folder}/{image_name}_digit_{i}.jpg'
@@ -208,9 +200,9 @@ class YOLOCropper:
 
 
 
-cropper = YOLOCropper(model_path='weights/best.pt', obb_model=True) #runs/detect/train/weights/best.pt
+cropper = YOLOCropper(model_path='Yolo_project/weights/best_v1.pt', obb_model=True) #runs/detect/train/weights/best.pt
 # cropper.crop_image(image_path='TlkWaterMeters/images/id_9_value_18_724.jpg', output_dir='CroppedImages')
 # cropper.crop_image(image_path='TlkWaterMeters/images/id_553_value_65_475.jpg', output_dir='CroppedImages')
 # cropper.crop_image(image_path='TlkWaterMeters/images/id_823_value_797_0.jpg', output_dir='CroppedImages')
-# cropper.crop_images_from_folder(input_dir='TlkWaterMeters/images', output_dir='CroppedImages', max_images=500)
-cropper.cut_images_into_numbers(input_dir='CroppedImages')
+cropper.crop_images_from_folder(input_dir='Yolo_project/TlkWaterMeters/images', output_dir='Yolo_project/CroppedImages', max_images=500)
+cropper.cut_images_into_numbers(input_dir='Yolo_project/CroppedImages', output_dir='Yolo_project/digits')
