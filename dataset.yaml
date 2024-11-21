@@ -3,6 +3,6 @@ names: ['digit8', 'digit5']
 nc: 2
 
 path: 
-train: datasets/images/train
-val: datasets/images/val
-test: datasets/images/val
+train: data/datasets/images/train
+val: data/datasets/images/val
+test: data/datasets/images/val

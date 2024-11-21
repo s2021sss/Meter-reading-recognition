@@ -11,8 +11,20 @@ import numpy as np
 from scipy.spatial import ConvexHull
 
 class YOLOTrainer:
-    def __init__(self, data_path, image_dir, tags_dir, model_name='YOLOv8m.pt', obb_model=False):
-        # Инициализация класса, загрузка данных и разделение на обучающую и валидационную выборки
+    """Класс для обучения модели YOLO на размеченных данных счетчиков."""
+
+    def __init__(self, data_path, image_dir, tags_dir, model_name='models/yolo/yolov8m.pt', obb_model=False):
+        """
+        Инициализация тренера YOLO и подготовка данных.
+
+        Args:
+            data_path (str): Путь к файлу с данными.
+            image_dir (str): Директория с изображениями.
+            tags_dir (str): Директория с файлами тегов.
+            model_name (str): Имя или путь к предобученной модели YOLO.
+            obb_model (bool): Флаг для использования модели с ориентированными ограничивающими рамками.
+        """
+
         self.data = pd.read_csv(data_path, sep='\t')
         # self.train_data, self.val_data = train_test_split(self.data, test_size=0.2, random_state=42)
 
@@ -29,20 +41,20 @@ class YOLOTrainer:
         self.image_dir = image_dir
         self.tags_dir = tags_dir
         self.model_name = model_name
-        self.setup_directories()
         self.obb_model = True if "-obb.pt" in model_name or obb_model else False
 
-    def setup_directories(self):
-        # Создание директорий для хранения данных для обучения и валидации
-        os.makedirs('datasets/images/train', exist_ok=True)
-        os.makedirs('datasets/labels/train', exist_ok=True)
-        os.makedirs('datasets/images/val', exist_ok=True)
-        os.makedirs('datasets/labels/val', exist_ok=True)
-        os.makedirs('datasets/images_obb/train', exist_ok=True)
-        os.makedirs('datasets/images_obb/val', exist_ok=True)
-
     def convert_polygon_to_bbox(self, polygon_data, img_width, img_height):
-        # Преобразование полигональных данных в координаты ограничивающей рамки (bbox)
+        """
+        Преобразует данные полигона в координаты ограничивающей рамки (bbox).
+
+        Args:
+            polygon_data (list): Список координат полигона.
+            img_width (int): Ширина изображения.
+            img_height (int): Высота изображения.
+
+        Returns:
+            tuple: Нормализованные координаты центра и размеры рамки.
+        """
         xs = [point['x'] * img_width for point in polygon_data]
         ys = [point['y'] * img_height for point in polygon_data]
         x_min, x_max = min(xs), max(xs)
@@ -56,7 +68,17 @@ class YOLOTrainer:
         return x_center / img_width, y_center / img_height, bbox_width / img_width, bbox_height / img_height
 
     def convert_polygon_to_obb_points(self, polygon_data, img_width, img_height):
-        # Преобразование полигональных данных в координаты ориентированной ограничивающей рамки (OBB)
+        """
+        Преобразует данные полигона в координаты ориентированной рамки (OBB).
+
+        Args:
+            polygon_data (list): Список координат полигона.
+            img_width (int): Ширина изображения.
+            img_height (int): Высота изображения.
+
+        Returns:
+            list: Нормализованные координаты точек ориентированной рамки.
+        """
         points = np.array([[point['x'] * img_width, point['y'] * img_height] for point in polygon_data])
         
         hull = ConvexHull(points)
@@ -71,13 +93,30 @@ class YOLOTrainer:
         return normalized_points
 
     def get_image_size(self, image_path):
-        # Получение размеров изображения
+        """
+        Возвращает размеры изображения.
+
+        Args:
+            image_path (str): Путь к изображению.
+
+        Returns:
+            tuple: Ширина и высота изображения.
+        """
         img = cv2.imread(image_path)
         height, width = img.shape[:2]
         return width, height
     
     def draw_obb_on_image(self, image_path, obb_points, img_width, img_height, save_path):
-        # Сохранение исходных заново размеченных изображений 
+        """
+        Рисует ориентированную рамку (OBB) на изображении и сохраняет его.
+
+        Args:
+            image_path (str): Путь к исходному изображению.
+            obb_points (list): Координаты ориентированной рамки.
+            img_width (int): Ширина изображения.
+            img_height (int): Высота изображения.
+            save_path (str): Путь для сохранения изображения.
+        """
         image = cv2.imread(image_path)
         
         obb_points = np.array([[x * img_width, y * img_height] for x, y in obb_points], dtype=np.int32)
@@ -87,7 +126,21 @@ class YOLOTrainer:
         cv2.imwrite(save_path, image)
 
     def move_images_and_create_labels(self, data, img_dest, label_dest, obb_img_dest):
-        # Скопирование изображений и создание меток для YOLO
+        """
+        Создает метки и перемещает изображения в соответствующие директории.
+
+        Args:
+            data (DataFrame): Данные с информацией о метках и изображениях.
+            img_dest (str): Путь для сохранения изображений.
+            label_dest (str): Путь для сохранения меток.
+            obb_img_dest (str): Путь для сохранения изображений с OBB.
+        """
+
+
+        os.makedirs(img_dest, exist_ok=True)
+        os.makedirs(label_dest, exist_ok=True)
+        os.makedirs(obb_img_dest, exist_ok=True)
+
         for _, row in tqdm(data.iterrows(), total=data.shape[0]):
             image_name = row['photo_name']
             image_path = os.path.join(self.image_dir, image_name)
@@ -112,8 +165,8 @@ class YOLOTrainer:
             self.draw_obb_on_image(image_path, coords, img_width, img_height, save_obb_img_path)
 
     def read_tags(self):
-        # Добавление отдельных классов для нестандартных счетчиков
-        file_names = [f for f in glob.glob("TlkWaterMeters/tags/*.txt")]
+        """Читает теги отдельных классов для нестандартных счетчиков из файла и добавляет их в атрибут `tags`."""
+        file_names = [f for f in glob.glob("data/TlkWaterMeters/tags/*.txt")]
 
         self.tags = {}
 
@@ -124,18 +177,26 @@ class YOLOTrainer:
                 self.tags[img_name] = file_name.split("/")[-1][:-4]
 
     def prepare_data(self):
-        # Подготовка данных: создание меток и копирование изображений
-        self.move_images_and_create_labels(self.train_data, 'datasets/images/train', 'datasets/labels/train', 'datasets/images_obb/train')
-        self.move_images_and_create_labels(self.val_data, 'datasets/images/val', 'datasets/labels/val', 'datasets/images_obb/val')
+        """Подготавливает данные для обучения и валидации."""
+        self.move_images_and_create_labels(self.train_data, 'data/datasets/images/train', 'data/datasets/labels/train', 'data/datasets/images_obb/train')
+        self.move_images_and_create_labels(self.val_data, 'data/datasets/images/val', 'data/datasets/labels/val', 'data/datasets/images_obb/val')
 
     def train_model(self, epochs=5, imgsz=640, batch_size=16):
-        # Обучение модели YOLO
+        """
+        Обучает модель YOLO.
+
+        Args:
+            epochs (int): Количество эпох обучения.
+            imgsz (int): Размер изображений для обучения.
+            batch_size (int): Размер батча.
+        """
         model = YOLO(self.model_name)
         model.train(data='dataset.yaml', epochs=epochs, imgsz=imgsz, batch=batch_size)
 
 
-# trainer = YOLOTrainer(data_path='TlkWaterMeters/data.tsv', image_dir='TlkWaterMeters/images', tags_dir='TlkWaterMeters/tags', model_name='YOLOv8m.pt')
-trainer = YOLOTrainer(data_path='TlkWaterMeters/data.tsv', image_dir='TlkWaterMeters/images', tags_dir='TlkWaterMeters/tags', model_name='yolo11n-obb.pt', obb_model=True)
+if __name__ == "__main__":
+    # trainer = YOLOTrainer(data_path='data/TlkWaterMeters/data.tsv', image_dir='data/TlkWaterMeters/images', tags_dir='data/TlkWaterMeters/tags', model_name='models/yolo/yolov8m.pt')
+    trainer = YOLOTrainer(data_path='data/TlkWaterMeters/data.tsv', image_dir='data/TlkWaterMeters/images', tags_dir='data/TlkWaterMeters/tags', model_name='models/yolo/yolo11n-obb.pt', obb_model=True)
 
-# trainer.prepare_data() 
-# trainer.train_model(epochs=3, imgsz=640, batch_size=16) 
+    trainer.prepare_data() 
+    trainer.train_model(epochs=1, imgsz=640, batch_size=16) 

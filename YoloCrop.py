@@ -5,10 +5,23 @@ from tqdm import tqdm
 from ultralytics import YOLO
 from scipy.stats import kurtosis
 import glob
+import shutil
 
 class YOLOCropper:
+    """
+    Класс для обрезки изображений с помощью модели YOLO.
+    """
     def __init__(self, model_path, img_size=640, iou_thresh=0.4, conf_thresh=0.75, obb_model=False):
-        # Инициализация модели YOLO и ее параметров
+        """
+        Инициализация класса YOLOCropper.
+
+        Args:
+            model_path (str): Путь к модели YOLO.
+            img_size (int): Размер изображений для обработки.
+            iou_thresh (float): Порог пересечения (IoU) для фильтрации рамок.
+            conf_thresh (float): Порог уверенности для предсказания объектов.
+            obb_model (bool): Использовать ли модель с обобщенными ограничивающими рамками (OBB).
+        """
         self.model = YOLO(model_path)
         self.img_size = img_size
         self.iou_thresh = iou_thresh # порог для фильтрации перекрывающихся ограничивающих рамок 
@@ -20,7 +33,15 @@ class YOLOCropper:
         self.obb_model = obb_model
 
     def is_image_flipped(self, warped):
-        # Обработка перевернутого изображения
+        """
+        Проверяет, перевернуто ли изображение, и корректирует его.
+
+        Args:
+            warped (numpy.ndarray): Изображение для проверки.
+
+        Returns:
+            numpy.ndarray: Скорректированное изображение.
+        """
         hsv_image = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV) # пространство HSV
     
         red_mask = cv2.inRange(hsv_image, (0, 50, 50), (10, 255, 255)) | cv2.inRange(hsv_image, (350, 50, 50), (360, 255, 255))
@@ -38,8 +59,14 @@ class YOLOCropper:
 
         return warped
 
-    def crop_image(self, image_path, output_dir='CroppedImages'):
-        # Функция обрезки изображения на основе предсказаний модели YOLO
+    def crop_image(self, image_path, output_dir='data/CroppedImages'):
+        """
+        Обрезает изображение на основе предсказаний модели YOLO.
+
+        Args:
+            image_path (str): Путь к изображению для обработки.
+            output_dir (str): Путь для сохранения обрезанных изображений.
+        """
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
                 
@@ -50,7 +77,7 @@ class YOLOCropper:
             print(f"Не удалось загрузить изображение {image_path}")
             return
         
-        res = self.model(img, imgsz=self.img_size, iou=self.iou_thresh, conf=self.conf_thresh)
+        res = self.model(img, imgsz=self.img_size, iou=self.iou_thresh, conf=self.conf_thresh, verbose=False)
         number_of_WaterMeters = 0
         object_found = False  
 
@@ -103,27 +130,53 @@ class YOLOCropper:
         if not object_found:
             cv2.imwrite(os.path.join(output_dir, os.path.basename(image_path)), img)
 
-        print(f"Обработка изображения {image_path} завершена.")
+        # print(f"Обработка изображения {image_path} завершена.")
 
-    def crop_images_from_folder(self, input_dir, output_dir='CroppedImages', max_images=None):
-        # Функция для обрезки всех изображений в папке на основе предсказаний модели YOLO
-        image_files = [f for f in os.listdir(input_dir) if f.endswith(('.jpg', '.png'))]
+    def crop_images_from_folder(self, input_dir, output_dir='CroppedImages', max_images=None, imagesForRecognition_dir=None):
+        """
+        Обрезает изображения из указанной папки.
+
+        Args:
+            input_dir (str): Папка с изображениями для обработки.
+            output_dir (str): Папка для сохранения обрезанных изображений.
+            max_images (int, optional): Максимальное количество изображений для обрезки.
+            imagesForRecognition_dir (str, optional): Папка для сохранения оставшихся изображений.
+        """
+        image_files_all = [f for f in sorted(os.listdir(input_dir)) if f.endswith(('.jpg', '.png'))]
     
         if max_images!=None:
-             image_files = image_files[:max_images]
+             image_files_for_crop = image_files_all[:max_images]
+             
+             if imagesForRecognition_dir!=None:
+                os.makedirs(imagesForRecognition_dir, exist_ok=True)
 
-        if not image_files:
+                for file in image_files_all[max_images:]:
+                    src_path = os.path.join(input_dir, file)
+                    dst_path = os.path.join(imagesForRecognition_dir, file)
+                    shutil.copy(src_path, dst_path)
+        else:
+            image_files_for_crop = image_files_all
+
+
+        if not image_files_for_crop:
             print(f"В папке {input_dir} нет изображений для обработки.")
             return
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        for image_file in tqdm(image_files, desc="Обрезка изображений"):
+        for image_file in tqdm(image_files_for_crop, desc="Обрезка изображений", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}"):
             image_path = os.path.join(input_dir, image_file)
             self.crop_image(image_path, output_dir)
 
     def cut_images_into_numbers(self, input_dir, output_dir='digits'):
+        """
+        Разделяет изображения счетчиков на отдельные цифры и сохраняет их в нужных папках для обучения нейронной сети  
+
+        Args:
+            input_dir (str): Папка с изображениями счетчиков.
+            output_dir (str): Папка для сохранения отдельных цифр.
+        """
         for filename in glob.glob(input_dir+"/*"):
             try:
                 image_name = os.path.basename(filename).split('.')[0]
@@ -200,9 +253,79 @@ class YOLOCropper:
 
 
 
-cropper = YOLOCropper(model_path='Yolo_project/weights/best_v1.pt', obb_model=True) #runs/detect/train/weights/best.pt
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_9_value_18_724.jpg', output_dir='CroppedImages')
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_553_value_65_475.jpg', output_dir='CroppedImages')
-# cropper.crop_image(image_path='TlkWaterMeters/images/id_823_value_797_0.jpg', output_dir='CroppedImages')
-cropper.crop_images_from_folder(input_dir='Yolo_project/TlkWaterMeters/images', output_dir='Yolo_project/CroppedImages', max_images=500)
-cropper.cut_images_into_numbers(input_dir='Yolo_project/CroppedImages', output_dir='Yolo_project/digits')
+    def cut_image(self, input_dir):
+        """
+        Разделяет одно изображение на цифры для распознавания цифр на изображении
+
+        Args:
+            input_dir (str): Путь к папке, содержащей изображение для обработки.
+        """
+        image_path = glob.glob(input_dir+"/id*")[0]
+        
+        try:
+            image_name = os.path.basename(image_path).split('.')[0]
+            output_dir = input_dir + "/digits"
+            os.makedirs(output_dir, exist_ok=True)  
+
+            parts = image_name.split('value_')
+            if len(parts) > 1 and 'cropped' in parts[1]:
+                digit_class = int(parts[1].split('_')[-2])
+
+                
+                if digit_class == 1:
+
+                    image = cv2.imread(image_path)
+                    
+                    if image is None:
+                        raise ValueError(f"Не удалось загрузить изображение: {image_name}")
+                    
+                    height, width = image.shape[:2]
+                    column_width = width // 5
+
+                    for i in range(5):
+                        x_start = i * column_width
+                        x_end = x_start + column_width
+                        column = image[:, x_start:x_end]
+
+                        output_filename = f'{output_dir}/{image_name}_digitN_{i}.jpg'
+                        cv2.imwrite(output_filename, column)     
+
+
+                else:
+
+
+                    image = cv2.imread(image_path)
+
+                    if image is None:
+                        raise ValueError(f"Не удалось загрузить изображение: {image_name}")
+                    
+                    height, width = image.shape[:2]
+                    column_width = width // 8
+
+
+                    for i in range(8):
+                        x_start = i * column_width
+                        x_end = x_start + column_width
+                        column = image[:, x_start:x_end]
+
+                        output_filename = f'{output_dir}/{image_name}_digitN_{i}.jpg'
+                        cv2.imwrite(output_filename, column)
+                    
+
+            else:
+                print (f"Изображение {image_name} не обработано")
+        
+        except Exception as e:
+            print(f"Ошибка: {e}")
+            return None
+
+
+if __name__ == "__main__":
+    cropper = YOLOCropper(model_path='models/weights/best_v1.pt', obb_model=True) #runs/detect/train/weights/best.pt
+
+    # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_9_value_18_724.jpg', output_dir='data/CroppedImages')
+    # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_553_value_65_475.jpg', output_dir='data/CroppedImages')
+    # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_823_value_797_0.jpg', output_dir='data/CroppedImages')
+
+    cropper.crop_images_from_folder(input_dir='data/TlkWaterMeters/images', output_dir='data/CroppedImages', max_images=1100, imagesForRecognition_dir='data/ImagesForRecognition')
+    cropper.cut_images_into_numbers(input_dir='data/CroppedImages', output_dir='data/digits')
