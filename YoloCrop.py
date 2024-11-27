@@ -3,26 +3,30 @@ import os
 import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
-from scipy.stats import kurtosis
 import glob
 import shutil
+import torch
+from PIL import Image
+from torchvision import transforms
+from Train_CNN_for_upside_down_images import CustomCNNForUpsideDownImages
 
 class YOLOCropper:
     """
     Класс для обрезки изображений с помощью модели YOLO.
     """
-    def __init__(self, model_path, img_size=640, iou_thresh=0.4, conf_thresh=0.75, obb_model=False):
+    def __init__(self, yolo_model_path, cnn_model_path_upside_down_img, img_size=640, iou_thresh=0.4, conf_thresh=0.75, obb_model=False):
         """
         Инициализация класса YOLOCropper.
 
         Args:
-            model_path (str): Путь к модели YOLO.
+            yolo_model_path (str): Путь к модели YOLO.
+            cnn_model_path_upside_down_img (str): Путь к модели CNN для распознавания перевернутых изображений.
             img_size (int): Размер изображений для обработки.
             iou_thresh (float): Порог пересечения (IoU) для фильтрации рамок.
             conf_thresh (float): Порог уверенности для предсказания объектов.
             obb_model (bool): Использовать ли модель с обобщенными ограничивающими рамками (OBB).
         """
-        self.model = YOLO(model_path)
+        self.model = YOLO(yolo_model_path)
         self.img_size = img_size
         self.iou_thresh = iou_thresh # порог для фильтрации перекрывающихся ограничивающих рамок 
         # (если на одном изображении предсказывается несколько рамок, то при пересечении двумя рамками порога iou_thresh, 
@@ -31,6 +35,16 @@ class YOLOCropper:
         self.conf_thresh = conf_thresh # минимальное значение уверенности для того, чтобы модель считала, что объект обнаружен на изображении
 
         self.obb_model = obb_model
+
+
+        self.modelUpsideDownImages = CustomCNNForUpsideDownImages()
+        self.modelUpsideDownImages.load_state_dict(torch.load(cnn_model_path_upside_down_img))
+        self.modelUpsideDownImages.eval()
+        
+        self.transform = transforms.Compose([
+        transforms.Resize((80, 300)),
+        transforms.ToTensor()
+        ])
 
     def is_image_flipped(self, warped):
         """
@@ -58,6 +72,25 @@ class YOLOCropper:
             warped = cv2.rotate(warped, cv2.ROTATE_180)
 
         return warped
+
+    def flip_upside_down_images(self, image_path):
+        """
+        Переворачивает изображние на основе CustomCNNForUpsideDownImages.
+
+        Args:
+            input_dir (str): Путь к изображениям для обработки.
+        """
+        
+        image = Image.open(image_path).convert('RGB')
+        image = self.transform(image).unsqueeze(0)
+        
+        with torch.no_grad():
+            outputs = self.modelUpsideDownImages(image)
+            predicted_class = int(np.round(torch.sigmoid(outputs)).item())
+        if predicted_class == 1:
+            img = cv2.imread(image_path)
+            warped = cv2.rotate(img, cv2.ROTATE_180)
+            cv2.imwrite(image_path, warped)
 
     def crop_image(self, image_path, output_dir='data/CroppedImages'):
         """
@@ -107,8 +140,11 @@ class YOLOCropper:
 
                         warped = self.is_image_flipped(warped)
 
-                        cv2.imwrite(os.path.join(output_dir, os.path.basename(f'{image_name}_cropped_{digit_class}_{number_of_WaterMeters}.jpg')), warped)
+                        image_path_new = os.path.join(output_dir, os.path.basename(f'{image_name}_cropped_{digit_class}_{number_of_WaterMeters}.jpg'))
 
+                        cv2.imwrite(image_path_new, warped)
+                        
+                        self.flip_upside_down_images(image_path_new)
  
                         number_of_WaterMeters += 1
                         object_found = True
@@ -132,7 +168,7 @@ class YOLOCropper:
 
         # print(f"Обработка изображения {image_path} завершена.")
 
-    def crop_images_from_folder(self, input_dir, output_dir='CroppedImages', max_images=None, imagesForRecognition_dir=None):
+    def crop_images_from_folder(self, input_dir, output_dir='data/CroppedImages', max_images=None, imagesForRecognition_dir=None):
         """
         Обрезает изображения из указанной папки.
 
@@ -168,7 +204,7 @@ class YOLOCropper:
         for image_file in tqdm(image_files_for_crop, desc="Обрезка изображений", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}"):
             image_path = os.path.join(input_dir, image_file)
             self.crop_image(image_path, output_dir)
-
+        
     def cut_images_into_numbers(self, input_dir, output_dir='digits'):
         """
         Разделяет изображения счетчиков на отдельные цифры и сохраняет их в нужных папках для обучения нейронной сети  
@@ -321,11 +357,17 @@ class YOLOCropper:
 
 
 if __name__ == "__main__":
-    cropper = YOLOCropper(model_path='models/weights/best_v1.pt', obb_model=True) #runs/detect/train/weights/best.pt
+    cropper = YOLOCropper(yolo_model_path='models/weights/best_v1.pt', 
+                          cnn_model_path_upside_down_img='models/CustomCNNForUpsideDownImages.pth',
+                          obb_model=True) #runs/detect/train/weights/best.pt
 
     # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_9_value_18_724.jpg', output_dir='data/CroppedImages')
     # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_553_value_65_475.jpg', output_dir='data/CroppedImages')
     # cropper.crop_image(image_path='data/TlkWaterMeters/images/id_823_value_797_0.jpg', output_dir='data/CroppedImages')
 
-    cropper.crop_images_from_folder(input_dir='data/TlkWaterMeters/images', output_dir='data/CroppedImages', max_images=1100, imagesForRecognition_dir='data/ImagesForRecognition')
+    cropper.crop_images_from_folder(input_dir='data/TlkWaterMeters/images', 
+                                    output_dir='data/CroppedImages', 
+                                    max_images=1100, 
+                                    imagesForRecognition_dir='data/ImagesForRecognition'
+                                    )
     cropper.cut_images_into_numbers(input_dir='data/CroppedImages', output_dir='data/digits')

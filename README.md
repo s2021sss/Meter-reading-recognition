@@ -50,6 +50,38 @@ pip install -r requirements.txt
 
 
 ---
+## Установка и запуск
+
+Для запуска проекта выполните следующие шаги.
+
+### Запуск через Docker
+
+1. **Соберите Docker-образ**
+
+   Выполните команду из корневой папки проекта:
+
+   ```bash
+   docker build -t meter-recognizer .
+   ```
+
+2. **Запустите контейнер**
+
+   - **Для распознавания показания одного счетчика**:
+
+     Убедитесь, что файл с изображением доступен в контейнере.
+
+
+    - На MacOS и Linux:
+     ```bash
+     docker run --rm -v $(pwd)/data:/data meter-recognizer --image-path data/ImagesForRecognition/id_8_value_1095_124.jpg
+     ```
+
+    - На Windows:
+    ```bash
+     docker run-v  "Путь к папке с изображением:/data" meter-recognizer --image-path data/ImagesForRecognition/id_8_value_1095_124.jpg
+     ```
+     
+     Это подключит папку `data` из текущей директории на локальном компьютере в контейнер, и скрипт сможет считать файл для распознавания.
 
 
 ## **Вывод**

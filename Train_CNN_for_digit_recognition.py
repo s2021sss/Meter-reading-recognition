@@ -231,7 +231,7 @@ class DigitsClassificationPipeline:
 
         return accuracy, f1, mae
 
-    def save_model(self, path="models/custom_cnn.pth"):
+    def save_model(self, path='models/CustomCNNForDigits.pth'):
         """Сохранение обученной модели.
 
         Args:
@@ -242,8 +242,8 @@ class DigitsClassificationPipeline:
 
 
 if __name__ == "__main__":
-    pipeline = DigitsClassificationPipeline(root_dir="data/digits", epochs=20)
+    pipeline = DigitsClassificationPipeline(root_dir="data/digits", epochs=10)
     pipeline.prepare_datasets()
     pipeline.train()
     pipeline.evaluate()
-    pipeline.save_model()
+    # pipeline.save_model()

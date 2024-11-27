@@ -10,21 +10,22 @@ from PIL import Image
 class MeterImageRecognizer:
     """Класс для распознавания значений счетчиков с помощью YOLO и CNN."""
 
-    def __init__(self, yolo_model_path, cnn_model_path, cropped_dir="data/CroppedImagesForRecognition"):
+    def __init__(self, yolo_model_path, cnn_model_path_upside_down_img, cnn_model_path_digit_recogn, cropped_dir="data/CroppedImagesForRecognition"):
         """
         Инициализация класса распознавателя изображений счетчиков.
 
         Args:
             yolo_model_path (str): Путь к модели YOLO.
-            cnn_model_path (str): Путь к модели CNN.
+            cnn_model_path_upside_down_img (str): Путь к модели CNN для распознавания перевернутых изображений.
+            cnn_model_path_digit_recogn (str): Путь к модели CNN для распознавания цифр.
             cropped_dir (str): Директория для сохранения обрезанных изображений.
         """
         self.cropped_dir = cropped_dir
 
-        self.cropper = YOLOCropper(model_path=yolo_model_path, obb_model=True)
+        self.cropper = YOLOCropper(yolo_model_path=yolo_model_path, cnn_model_path_upside_down_img=cnn_model_path_upside_down_img, obb_model=True)
 
         self.model = CustomCNNForDigits()
-        self.model.load_state_dict(torch.load(cnn_model_path))
+        self.model.load_state_dict(torch.load(cnn_model_path_digit_recogn))
         self.model.eval()
 
         self.transform = transforms.Compose([
@@ -102,19 +103,21 @@ class MeterImageRecognizer:
         return results
 
 
-recognizer = MeterImageRecognizer(
-    yolo_model_path='models/weights/best_v1.pt',
-    cnn_model_path='models/custom_cnn.pth',
-    cropped_dir='data/CroppedImagesForRecognition'
-)
+if __name__ == "__main__":
+    recognizer = MeterImageRecognizer(
+        yolo_model_path='models/weights/best_v1.pt',
+        cnn_model_path_upside_down_img = 'models/CustomCNNForUpsideDownImages.pth',
+        cnn_model_path_digit_recogn='models/CustomCNNForDigits.pth',
+        cropped_dir='data/CroppedImagesForRecognition'
+    )
 
-single_image_path = 'data/ImagesForRecognition/id_8_value_1095_124.jpg'
-single_image_name = single_image_path.split("/")[-1]
-recognized_number = recognizer.process_single_image(single_image_path)
-print(f"Recognized Number {single_image_name}: {recognized_number}")
+    single_image_path = 'data/ImagesForRecognition/id_8_value_1095_124.jpg'
+    single_image_name = single_image_path.split("/")[-1]
+    recognized_number = recognizer.process_single_image(single_image_path)
+    print(f"Recognized Number {single_image_name}: {recognized_number}")
 
 
-results = recognizer.process_directory('data/ImagesForRecognition')
+    results = recognizer.process_directory('data/ImagesForRecognition')
 
-for image_name, recognized_number in results.items():
-    print(f"Image: {image_name}, Recognized Number: {recognized_number}")
+    for image_name, recognized_number in results.items():
+        print(f"Image: {image_name}, Recognized Number: {recognized_number}")
