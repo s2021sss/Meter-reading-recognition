@@ -101,11 +101,44 @@ class MeterImageRecognizer:
             results[image_name] = recognized_number
 
         return results
+    
+    @staticmethod
+    def count_mismatched_characters(part1, part2):
+        max_length = max(len(part1), len(part2))
+        part1 = part1.zfill(max_length)
+        part2 = part2.zfill(max_length)
+        return sum(c1 != c2 for c1, c2 in zip(part1, part2))
+    
+    @staticmethod
+    def compare_strings(image_name, recognized_number):
+        if '.' in recognized_number:
+            recognized_number_value1, recognized_number_value2 = recognized_number.split('.', 1)
+        else:
+            recognized_number_value1, recognized_number_value2 = recognized_number, ''
+
+        image_parts = image_name.split('_')
+        
+        image_parts = image_name.split('value_')
+        image_name_value1 = image_parts[1].split('_')[0]
+        image_name_value2 = (image_parts[1].split('_')[1]).split('.')[0]
+
+
+        if image_name_value2 != "0":
+            padded_value = image_name_value1.zfill(8-max(len(image_name_value2), 3)) + image_name_value2.ljust(max(len(image_name_value2), 3),'0')
+        else:
+            padded_value = image_name_value1.zfill(5)
+
+        
+        if len(padded_value)==5:
+            return MeterImageRecognizer.count_mismatched_characters(image_name_value1, recognized_number_value1)
+        else:
+            return MeterImageRecognizer.count_mismatched_characters(image_name_value1, recognized_number_value1) + \
+                MeterImageRecognizer.count_mismatched_characters(image_name_value2, recognized_number_value2)
 
 
 if __name__ == "__main__":
     recognizer = MeterImageRecognizer(
-        yolo_model_path='models/weights/best_v1.pt',
+        yolo_model_path='models/weights/best.pt',
         cnn_model_path_upside_down_img = 'models/CustomCNNForUpsideDownImages.pth',
         cnn_model_path_digit_recogn='models/CustomCNNForDigits.pth',
         cropped_dir='data/CroppedImagesForRecognition'
@@ -120,4 +153,5 @@ if __name__ == "__main__":
     results = recognizer.process_directory('data/ImagesForRecognition')
 
     for image_name, recognized_number in results.items():
-        print(f"Image: {image_name}, Recognized Number: {recognized_number}")
+        print(f"Image: {image_name}, Recognized Number: {recognized_number}" + \
+            (f", number of mismatched digits: {MeterImageRecognizer.compare_strings(image_name, recognized_number)}" if recognized_number!="" else ""))

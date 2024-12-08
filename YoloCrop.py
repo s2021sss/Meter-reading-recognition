@@ -14,7 +14,7 @@ class YOLOCropper:
     """
     Класс для обрезки изображений с помощью модели YOLO.
     """
-    def __init__(self, yolo_model_path, cnn_model_path_upside_down_img, img_size=640, iou_thresh=0.4, conf_thresh=0.75, obb_model=False):
+    def __init__(self, yolo_model_path, cnn_model_path_upside_down_img, img_size=640, iou_thresh=0.7, conf_thresh=0.75, obb_model=False):
         """
         Инициализация класса YOLOCropper.
 
