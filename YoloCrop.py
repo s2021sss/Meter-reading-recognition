@@ -225,7 +225,6 @@ class YOLOCropper:
                     
                     if digit_class == 1:
                         padded_value = value_part1.zfill(5)
-                        # print (padded_value)
 
                         image = cv2.imread(filename)
 
@@ -256,7 +255,6 @@ class YOLOCropper:
                             padded_value = value_part1.zfill(8-max(len(value_part2), 3)) + value_part2.ljust(max(len(value_part2), 3),'0')
                         else:
                             padded_value = value_part1.zfill(8)
-                        # print (padded_value)
 
                         image = cv2.imread(filename)
 
@@ -296,15 +294,15 @@ class YOLOCropper:
         Args:
             input_dir (str): Путь к папке, содержащей изображение для обработки.
         """
-        image_path = glob.glob(input_dir+"/id*")[0]
+        image_path = glob.glob(input_dir+"/"+input_dir.split("/")[-1][:1]+"*")[0]
         
         try:
             image_name = os.path.basename(image_path).split('.')[0]
             output_dir = input_dir + "/digits"
             os.makedirs(output_dir, exist_ok=True)  
 
-            parts = image_name.split('value_')
-            if len(parts) > 1 and 'cropped' in parts[1]:
+            parts = image_name.split('cropped_')
+            if len(parts) > 1 and 'cropped' in image_name:
                 digit_class = int(parts[1].split('_')[-2])
 
                 

@@ -6,7 +6,6 @@ import torch
 from torchvision import transforms
 from PIL import Image
 
-
 class MeterImageRecognizer:
     """Класс для распознавания значений счетчиков с помощью YOLO и CNN."""
 
@@ -48,8 +47,9 @@ class MeterImageRecognizer:
         image = self.transform(image).unsqueeze(0)
         with torch.no_grad():
             outputs = self.model(image)
-            predicted_class = outputs.argmax(dim=1).item()
-        return predicted_class
+            predicted_num = outputs.argmax(dim=1).item()
+
+        return predicted_num
 
     def process_single_image(self, image_path):
         """
@@ -144,14 +144,19 @@ if __name__ == "__main__":
         cropped_dir='data/CroppedImagesForRecognition'
     )
 
-    single_image_path = 'data/ImagesForRecognition/id_8_value_1095_124.jpg'
+    #Пример распознавания показания с одного изображения
+    single_image_path = 'data/ImagesForRecognition/id_924_value_625_593.jpg' 
+    # single_image_path = 'data/CroppedImagesForRecognition/id_963_value_242_778.jpg' # не распознанное изображение yolo
     single_image_name = single_image_path.split("/")[-1]
     recognized_number = recognizer.process_single_image(single_image_path)
     print(f"Recognized Number {single_image_name}: {recognized_number}")
 
-
+    #Пример распознавания показаний со всех изображений в папке
     results = recognizer.process_directory('data/ImagesForRecognition')
+    compare_results = []
 
     for image_name, recognized_number in results.items():
+        if recognized_number!="":
+            compare_results.append(MeterImageRecognizer.compare_strings(image_name, recognized_number))
         print(f"Image: {image_name}, Recognized Number: {recognized_number}" + \
-            (f", number of mismatched digits: {MeterImageRecognizer.compare_strings(image_name, recognized_number)}" if recognized_number!="" else ""))
+            (f", number of mismatched digits: {compare_results[-1] if recognized_number!='' else ''}" if recognized_number!="" else ""))
