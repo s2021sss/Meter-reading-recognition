@@ -8,10 +8,7 @@
 
 
 ### **1. `requirements.txt`**
-Файл со списком необходимых библиотек и их версий для работы проекта. Установка всех зависимостей:
-```bash
-pip install -r requirements.txt
-```
+Файл со списком необходимых библиотек и их версий для работы проекта.
 
 ---
 
@@ -83,17 +80,17 @@ pip install -r requirements.txt
 
    - **Для распознавания показания одного счетчика**:
 
-     Убедитесь, что файл с изображением доступен в контейнере.
+    Для корректной работы программы разместите изображения в папке, например, `data`.
 
 
     - На MacOS и Linux:
      ```bash
-     docker run --rm -v $(pwd)/data:/data meter-recognizer --image-path data/ImagesForRecognition/id_8_value_1095_124.jpg
+     docker run --rm -v $(pwd)/data:/data meter-recognizer --image-path data/test_img.jpg
      ```
 
     - На Windows:
     ```bash
-     docker run-v  "Путь к папке с изображением:/data" meter-recognizer --image-path data/ImagesForRecognition/id_8_value_1095_124.jpg
+     docker run-v  "Путь к папке с изображением:/data" meter-recognizer --image-path data/test_img.jpg
      ```
      
      Это подключит папку `data` из текущей директории на локальном компьютере в контейнер, и скрипт сможет считать файл для распознавания.
